@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,17 +34,19 @@ func main() {
 
 		go func() {
 			<-stop
-			srv.Shutdown(ctx)
-
+			err := srv.Shutdown(ctx)
+			if err != nil {
+				log.Println(err)
+			}
 			cancel()
+
 		}()
 
 		if err := srv.ListenAndServe(); err != nil {
 			return cli.NewExitError(err, 1)
 		}
-
 		return nil
 	}
 
-	app.Run(os.Args)
+	log.Fatal(app.Run(os.Args))
 }

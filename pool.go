@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -12,9 +11,9 @@ import (
 )
 
 type Result struct {
-	Response  []byte    `json:"response"`
-	Duration  duration  `json:"duration"`
-	CreatedAt time.Time `json:"created_at"`
+	Response  []byte   `json:"response"`
+	Duration  duration `json:"duration"`
+	CreatedAt duration `json:"created_at"`
 }
 
 type Task struct {
@@ -64,17 +63,20 @@ func (w *Worker) Fetching() {
 			w.Task = t
 		case <-time.After(time.Duration(*w.Task.Interval)):
 			timer := time.Now()
-			data := []byte{}
+			var data []byte
 
 			res, err := Client.Do(req)
-			if err != nil {
-				data = nil
-			} else {
+			if err == nil {
 				data, _ = ioutil.ReadAll(res.Body)
 			}
-			d := time.Now().Sub(timer)
+			d := time.Since(timer)
 			w.Lock()
-			w.Results = append(w.Results, Result{Response: data, Duration: duration(d), CreatedAt: time.Now()})
+			w.Results = append(w.Results,
+				Result{Response: data,
+					Duration:  duration(d),
+					CreatedAt: duration(time.Now().Unix()),
+				},
+			)
 			w.Unlock()
 		}
 	}
@@ -124,7 +126,7 @@ func (p *Pool) Delete(id int64) {
 	delete(p.workersString, worker.URL)
 }
 
-func (p Pool) Tasks() []Task {
+func (p *Pool) Tasks() []Task {
 	p.Lock()
 	defer p.Unlock()
 	values := make([]Task, len(p.workersID), len(p.workersID))
@@ -136,10 +138,9 @@ func (p Pool) Tasks() []Task {
 	return values
 }
 
-func (p Pool) Results(task Task) []Result {
+func (p *Pool) Results(task Task) []Result {
 	p.Lock()
 	defer p.Unlock()
-	fmt.Println(*task.ID)
 	worker, ok := p.workersID[*task.ID]
 	if !ok {
 		return []Result{}
@@ -149,7 +150,7 @@ func (p Pool) Results(task Task) []Result {
 	return worker.Results
 }
 
-func (p Pool) TaskById(id int64) (Task, error) {
+func (p *Pool) TaskById(id int64) (Task, error) {
 	p.Lock()
 	defer p.Unlock()
 	worker, ok := p.workersID[id]

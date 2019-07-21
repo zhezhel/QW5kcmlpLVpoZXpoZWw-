@@ -16,7 +16,7 @@ import (
 type duration time.Duration
 
 func (d duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(d) / time.Second)
+	return json.Marshal(float64(time.Duration(d).Round(time.Millisecond)) / float64(time.Second))
 }
 
 func (d *duration) UnmarshalJSON(b []byte) error {
@@ -67,6 +67,10 @@ func Submit(p *Pool) func(w http.ResponseWriter, r *http.Request) {
 		task := Task{}
 		err = json.Unmarshal(data, &task)
 		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if task.URL == nil || task.Interval == nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
