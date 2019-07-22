@@ -74,7 +74,7 @@ func (w *Worker) Fetching() {
 			w.Results = append(w.Results,
 				Result{Response: data,
 					Duration:  duration(d),
-					CreatedAt: duration(time.Now().Unix()),
+					CreatedAt: duration(time.Now().UnixNano()),
 				},
 			)
 			w.Unlock()
@@ -129,7 +129,7 @@ func (p *Pool) Delete(id int64) {
 func (p *Pool) Tasks() []Task {
 	p.Lock()
 	defer p.Unlock()
-	values := make([]Task, len(p.workersID), len(p.workersID))
+	values := make([]Task, len(p.workersID))
 	idx := 0
 	for _, v := range p.workersID {
 		values[idx] = v.Task

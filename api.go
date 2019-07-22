@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,7 +17,8 @@ import (
 type duration time.Duration
 
 func (d duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(float64(time.Duration(d).Round(time.Millisecond)) / float64(time.Second))
+	seconds := float64(time.Duration(d).Nanoseconds()) / float64(time.Second)
+	return json.Marshal(math.Round(seconds*1000.0) / 1000.0)
 }
 
 func (d *duration) UnmarshalJSON(b []byte) error {
