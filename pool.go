@@ -92,8 +92,8 @@ func fetch(client *http.Client, w *Worker, url string) {
 	w.AddResult(data, d, time.Duration(time.Now().UnixNano()))
 }
 
-func (w *Worker) Fetching() {
-	Client := &http.Client{
+func httpClient() *http.Client {
+	return &http.Client{
 		Timeout: time.Second * 5,
 		Transport: &http.Transport{
 			Dial: (&net.Dialer{
@@ -102,7 +102,10 @@ func (w *Worker) Fetching() {
 			TLSHandshakeTimeout: 5 * time.Second,
 		},
 	}
+}
 
+func (w *Worker) Fetching() {
+	client := httpClient()
 	for {
 		select {
 		case <-w.Context.Done():
@@ -110,15 +113,16 @@ func (w *Worker) Fetching() {
 		case t := <-w.Job:
 			w.Task = t
 		case <-time.After(time.Duration(*w.Task.Interval)):
-			go fetch(Client, w, *w.Task.URL)
+			go fetch(client, w, *w.Task.URL)
 		}
 	}
 }
 
 func (p *Pool) Submit(task Task) int64 {
-	worker, ok := p.workersString[*task.URL]
 	p.Lock()
 	defer p.Unlock()
+
+	worker, ok := p.workersString[*task.URL]
 
 	if !ok {
 		p.counter++
@@ -196,9 +200,8 @@ func (p *Pool) TaskById(id int64) (Task, error) {
 }
 
 func NewPool(ctx context.Context) *Pool {
-	p := Pool{Ctx: ctx}
-	p.counter = int64(0)
-	p.workersID = make(map[int64]*Worker)
-	p.workersString = make(map[string]*Worker)
-	return &p
+	return &Pool{Ctx: ctx,
+		counter:       int64(0),
+		workersID:     make(map[int64]*Worker),
+		workersString: make(map[string]*Worker)}
 }

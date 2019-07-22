@@ -39,13 +39,12 @@ func getRouter(p *Pool) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Get("/api/fetcher", Tasks(p))
-
-	r.Post("/api/fetcher", Submit(p))
-
-	r.Get("/api/fetcher/{id:\\d+}/history", History(p))
-
-	r.Delete("/api/fetcher/{id:\\d+}", Delete(p))
+	r.Route("/api", func(r chi.Router) {
+		r.Get("/fetcher", Tasks(p))
+		r.Post("/fetcher", Submit(p))
+		r.Get("/fetcher/{id:\\d+}/history", History(p))
+		r.Delete("/fetcher/{id:\\d+}", Delete(p))
+	})
 
 	return r
 }
@@ -111,6 +110,5 @@ func History(p *Pool) func(w http.ResponseWriter, r *http.Request) {
 
 		render.Status(r, http.StatusOK)
 		render.JSON(w, r, p.Results(task))
-
 	}
 }

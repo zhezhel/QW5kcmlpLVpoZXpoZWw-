@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/go-chi/chi"
@@ -20,6 +21,14 @@ func main() {
 	app.Name = "fetcher"
 	app.Version = "0.1.0"
 
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:   "p,port",
+			EnvVar: "PORT",
+			Value:  8080,
+		},
+	}
+
 	app.Action = func(c *cli.Context) error {
 		var stop = make(chan os.Signal)
 
@@ -30,7 +39,11 @@ func main() {
 		defer cancel()
 
 		r := getRouter(NewPool(ctx))
-		srv := http.Server{Addr: ":8080", Handler: chi.ServerBaseContext(ctx, r)}
+
+		port := strconv.Itoa(c.Int("port"))
+		log.Println("Listening...", port)
+
+		srv := http.Server{Addr: ":" + port, Handler: chi.ServerBaseContext(ctx, r)}
 
 		go func() {
 			<-stop
