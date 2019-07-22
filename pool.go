@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context/ctxhttp"
 )
 
 type Result struct {
@@ -42,6 +44,54 @@ type Worker struct {
 	Cancel  context.CancelFunc
 }
 
+func (w *Worker) AddResult(data []byte, dur, created_at time.Duration) {
+	w.Lock()
+	defer w.Unlock()
+	w.Results = append(w.Results, Result{Response: data,
+		Duration:  duration(dur),
+		CreatedAt: duration(created_at),
+	})
+}
+
+func (w *Worker) AddEmptyResult(dur, created_at time.Duration) {
+	w.AddResult(nil, dur, created_at)
+}
+
+func fetch(client *http.Client, w *Worker, url string) {
+	req, _ := http.NewRequest("GET", url, nil)
+	req = req.WithContext(w.Context)
+	timer := time.Now()
+	var data []byte
+
+	res, err := ctxhttp.Do(w.Context, client, req)
+
+	switch err {
+	case context.Canceled, context.DeadlineExceeded:
+		return
+	}
+
+	if err != nil {
+		w.AddEmptyResult(time.Since(timer),
+			time.Duration(time.Now().UnixNano()))
+		return
+	}
+
+	data, err = ioutil.ReadAll(res.Body)
+	switch err {
+	case context.Canceled, context.DeadlineExceeded:
+		return
+	}
+
+	if err != nil {
+		w.AddEmptyResult(time.Since(timer),
+			time.Duration(time.Now().UnixNano()))
+		return
+	}
+
+	d := time.Since(timer)
+	w.AddResult(data, d, time.Duration(time.Now().UnixNano()))
+}
+
 func (w *Worker) Fetching() {
 	Client := &http.Client{
 		Timeout: time.Second * 5,
@@ -52,8 +102,6 @@ func (w *Worker) Fetching() {
 			TLSHandshakeTimeout: 5 * time.Second,
 		},
 	}
-	req, _ := http.NewRequest("GET", *w.Task.URL, nil)
-	req = req.WithContext(w.Context)
 
 	for {
 		select {
@@ -62,22 +110,7 @@ func (w *Worker) Fetching() {
 		case t := <-w.Job:
 			w.Task = t
 		case <-time.After(time.Duration(*w.Task.Interval)):
-			timer := time.Now()
-			var data []byte
-
-			res, err := Client.Do(req)
-			if err == nil {
-				data, _ = ioutil.ReadAll(res.Body)
-			}
-			d := time.Since(timer)
-			w.Lock()
-			w.Results = append(w.Results,
-				Result{Response: data,
-					Duration:  duration(d),
-					CreatedAt: duration(time.Now().UnixNano()),
-				},
-			)
-			w.Unlock()
+			go fetch(Client, w, *w.Task.URL)
 		}
 	}
 }
